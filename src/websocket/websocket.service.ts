@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Contract, EventPayload, WebSocketProvider } from 'ethers';
+import { Contract, EventFragment, EventPayload, Fragment, InterfaceAbi, WebSocketProvider } from 'ethers';
 
 interface Event {
     anonymous: boolean,
@@ -21,37 +21,21 @@ export class WebsocketService {
     private provider: WebSocketProvider;
     private sc: Contract;
     constructor(
-        private readonly configService: ConfigService,
+        endPoint: string,
+        abi: InterfaceAbi,
+        contract_address: string,
     ) {
         console.info('[constructor]');
-        const endPoint = configService.get<string>('END_POINT')
         this.provider = new WebSocketProvider(endPoint)
-        this._setContract();
-        this.startTracking();
+        this._setContract(contract_address, abi);
     }
 
     async startTracking() {
         console.info('[startTracking]');
-        const scAbi = JSON.parse(this.configService.get<string>('SC_ABI'));
-        const events = scAbi
-            .abi
-            .filter((abi: any) => abi.type === 'event')
-            
-
-        events.map( async (event: Event) => {
-            
-            this.sc.on(event.name,(log:Array<any>) => {
-                console.log(log);
-            })
-            
-            // this.sc.on(event.name, this._eventListener);
+        const scAbi = this.sc.interface;
+        scAbi.forEachEvent(async (event: EventFragment) => {
+            this.sc.on(event.name, this._eventListener);
         })
-        // eventNames.map( async (eventName: string) => {
-        //     this.sc.on(eventName, (event: any) => {
-        //         console.log('[eventListener]');
-                
-        //     });
-        // })
     }
 
     getProvider(): WebSocketProvider {
@@ -65,18 +49,19 @@ export class WebsocketService {
         return this.sc;
     }
 
-    _setContract() {
+    _setContract(
+        contract_address: string,
+        abi: InterfaceAbi,
+    ) {
         console.info('[_setContract]');
-        const scAddress: string = this.configService.get('SC_ADDRESS');
-        const scAbi = JSON.parse(this.configService.get<string>('SC_ABI'));
-        this.sc = new Contract(scAddress, scAbi.abi, this.getProvider());
+        this.sc = new Contract(contract_address, abi, this.getProvider());
     }
 
-    _eventListener (from: string, to: string, value: BigInt, event: any) {
+    _eventListener(from: string, to: string, value: BigInt, event: any) {
         console.info('[_eventListener]');
         console.log('from : ', from);
         console.log('to : ', to);
         console.log('value : ', value);
-        console.log('event : ', event);        
+        console.log('event : ', event);
     }
 }
